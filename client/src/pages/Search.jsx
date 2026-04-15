@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, Mail, Calendar, FileText, Check, X, AlertTriangle } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { API_URL } from '../config';
 
 export default function SearchPage() {
   const [searchParams] = useSearchParams();

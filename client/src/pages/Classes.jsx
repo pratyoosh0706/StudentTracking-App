@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Users, Trash2, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { API_URL } from '../config';
 
 export default function Classes() {
   const [classes, setClasses] = useState([]);

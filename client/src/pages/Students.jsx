@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { GraduationCap, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { API_URL } from '../config';
 
 export default function Students() {
   const [students, setStudents] = useState([]);
