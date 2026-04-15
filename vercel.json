@@ -4,6 +4,6 @@
   "outputDirectory": "client/dist",
   "installCommand": "cd client && npm install",
   "env": {
-    "VITE_API_URL": "@student-admin-api-url"
+    "VITE_API_URL": "https://studenttracking-app.onrender.com"
   }
 }
