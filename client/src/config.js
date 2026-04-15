@@ -1,1 +1,2 @@
+// Hardcoded backend URL - DO NOT CHANGE
 export const API_URL = 'https://studenttracking-app.onrender.com/api';
