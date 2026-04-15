@@ -111,6 +111,9 @@ function App() {
           <Route path="/reports" element={<Reports />} />
           <Route path="/search" element={<SearchPage />} />
         </Routes>
+        <footer className="footer">
+          <p>Developed by Pratyoosh Shukla</p>
+        </footer>
       </main>
     </div>
   );

@@ -27,6 +27,8 @@ body {
 .app {
   display: flex;
   min-height: 100vh;
+  touch-action: pan-y;
+  overflow-x: hidden;
 }
 
 .sidebar {
@@ -818,4 +820,18 @@ tr:hover {
   .student-roll {
     display: none;
   }
+}
+
+.footer {
+  text-align: center;
+  padding: 30px 20px;
+  color: var(--text-light);
+  font-size: 13px;
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+}
+
+.footer p {
+  margin: 0;
 }
