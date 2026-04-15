@@ -1,0 +1,11 @@
+{
+  "name": "student-admin-panel",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "cd client && npm run dev",
+    "dev:server": "cd server && npm start",
+    "build": "cd client && npm run build",
+    "deploy": "vercel --prod"
+  }
+}

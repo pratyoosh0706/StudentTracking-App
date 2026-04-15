@@ -1,0 +1,250 @@
+import { useState, useEffect } from 'react';
+import { Search, Check, X, AlertTriangle } from 'lucide-react';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+export default function Attendance() {
+  const [rollNumber, setRollNumber] = useState('');
+  const [student, setStudent] = useState(null);
+  const [assignments, setAssignments] = useState([]);
+  const [selectedAssignment, setSelectedAssignment] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [status, setStatus] = useState('present_submitted');
+  const [recentAttendance, setRecentAttendance] = useState([]);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    fetch(`${API_URL}/attendance/${today}`)
+      .then(res => res.json())
+      .then(data => setRecentAttendance(data))
+      .catch(() => {});
+  }, []);
+
+  const handleSearch = async () => {
+    if (rollNumber.length !== 4) {
+      setMessage('Please enter a 4-digit roll number');
+      setStudent(null);
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/search/${rollNumber}`);
+    const data = await res.json();
+
+    if (data) {
+      setStudent(data);
+      setSelectedAssignment('');
+      
+      const assignmentsRes = await fetch(`${API_URL}/classes/${data.class_id}/assignments`);
+      const assignmentsData = await assignmentsRes.json();
+      setAssignments(assignmentsData);
+      
+      setMessage('');
+    } else {
+      setStudent(null);
+      setMessage('Student not found');
+    }
+  };
+
+  const handleMarkAttendance = async (e) => {
+    e.preventDefault();
+    
+    if (!student || !date) return;
+
+    try {
+      const res = await fetch(`${API_URL}/attendance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: student.id,
+          assignmentId: selectedAssignment || null,
+          date,
+          status,
+        }),
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        alert(`Attendance marked! ${result.marksObtained > 0 ? `+${result.marksObtained} marks` : 'No marks'}`);
+        
+        const today = new Date().toISOString().split('T')[0];
+        const attendanceRes = await fetch(`${API_URL}/attendance/${today}`);
+        const attendanceData = await attendanceRes.json();
+        setRecentAttendance(attendanceData);
+        
+        setStudent(null);
+        setRollNumber('');
+        setSelectedAssignment('');
+      }
+    } catch {
+      alert('Failed to mark attendance');
+    }
+  };
+
+  return (
+    <div>
+      <div className="page-header">
+        <h1>Attendance</h1>
+        <p>Mark attendance with smart search by roll number</p>
+      </div>
+
+      <div className="grid grid-2">
+        <div className="card">
+          <h2 style={{ marginBottom: '20px' }}>Mark Individual Attendance</h2>
+          
+          <div className="search-box">
+            <Search size={20} />
+            <input
+              type="text"
+              placeholder="Enter 4-digit roll number (e.g., 0001)"
+              value={rollNumber}
+              onChange={e => setRollNumber(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              maxLength={4}
+              autoFocus
+            />
+          </div>
+          
+          <button 
+            className="btn btn-primary" 
+            style={{ width: '100%', marginTop: '12px' }}
+            onClick={handleSearch}
+          >
+            <Search size={18} /> Search Student
+          </button>
+
+          {message && (
+            <div style={{ marginTop: '12px', padding: '12px', background: '#fee2e2', borderRadius: '8px', color: '#991b1b' }}>
+              {message}
+            </div>
+          )}
+
+          {student && (
+            <div className="search-result" style={{ marginTop: '20px' }}>
+              <h4>{student.name}</h4>
+              <p><strong>Roll:</strong> {student.roll_number}</p>
+              <p><strong>Class:</strong> {student.class_name}</p>
+              <p><strong>Email:</strong> {student.email || 'N/A'}</p>
+              <div className="marks-display" style={{ marginTop: '12px' }}>
+                Marks: {student.marks_obtained || 0}/{student.total_marks || 100}
+              </div>
+            </div>
+          )}
+
+          {student && (
+            <form onSubmit={handleMarkAttendance} style={{ marginTop: '20px' }}>
+              <div className="form-group">
+                <label>Date</label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={e => setDate(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Assignment (Optional)</label>
+                <select value={selectedAssignment} onChange={e => setSelectedAssignment(e.target.value)}>
+                  <option value="">-- Select Assignment --</option>
+                  {assignments.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.title} (Due: {new Date(a.deadline).toLocaleDateString()})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Status</label>
+                <div className="status-options">
+                  <div
+                    className={`status-option submitted ${status === 'present_submitted' ? 'selected' : ''}`}
+                    onClick={() => setStatus('present_submitted')}
+                  >
+                    <Check size={20} style={{ margin: '0 auto 4px' }} />
+                    Submitted
+                    <br /><small>+7 marks</small>
+                  </div>
+                  <div
+                    className={`status-option not-submitted ${status === 'present_not_submitted' ? 'selected' : ''}`}
+                    onClick={() => setStatus('present_not_submitted')}
+                  >
+                    <AlertTriangle size={20} style={{ margin: '0 auto 4px' }} />
+                    Not Submitted
+                    <br /><small>-0.5/day</small>
+                  </div>
+                  <div
+                    className={`status-option absent ${status === 'absent' ? 'selected' : ''}`}
+                    onClick={() => setStatus('absent')}
+                  >
+                    <X size={20} style={{ margin: '0 auto 4px' }} />
+                    Absent
+                    <br /><small>0 marks</small>
+                  </div>
+                </div>
+              </div>
+
+              <button type="submit" className="btn btn-success" style={{ width: '100%', marginTop: '16px' }}>
+                Mark Attendance
+              </button>
+            </form>
+          )}
+        </div>
+
+        <div className="card">
+          <h2 style={{ marginBottom: '20px' }}>Today's Attendance ({date})</h2>
+          
+          {recentAttendance.length === 0 ? (
+            <div className="empty-state">
+              <p>No attendance marked today</p>
+            </div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Roll</th>
+                  <th>Name</th>
+                  <th>Assignment</th>
+                  <th>Status</th>
+                  <th>Marks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentAttendance.map(a => (
+                  <tr key={a.id}>
+                    <td>{a.roll_number}</td>
+                    <td>{a.name}</td>
+                    <td>{a.assignment_title || '-'}</td>
+                    <td>
+                      {a.status === 'present_submitted' && (
+                        <span className="badge badge-success">Submitted</span>
+                      )}
+                      {a.status === 'present_not_submitted' && (
+                        <span className="badge badge-warning">Not Submitted</span>
+                      )}
+                      {a.status === 'absent' && (
+                        <span className="badge badge-danger">Absent</span>
+                      )}
+                    </td>
+                    <td>{a.marks_obtained > 0 ? `+${a.marks_obtained}` : '0'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: '20px' }}>
+        <h2 style={{ marginBottom: '20px' }}>Attendance Rules</h2>
+        <ul style={{ color: 'var(--text-light)', paddingLeft: '20px' }}>
+          <li><strong>Present + Submitted:</strong> Student gets +7 marks</li>
+          <li><strong>Present + Not Submitted:</strong> After deadline, -0.5 marks per day late</li>
+          <li><strong>Absent:</strong> 0 marks. After 2 consecutive absences, -0.5 countdown starts from 3rd absence</li>
+          <li><strong>Maximum marks:</strong> 100 per year</li>
+          <li><strong>Smart Search:</strong> Enter the 4-digit roll number to quickly find and mark attendance</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
