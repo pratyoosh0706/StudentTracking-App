@@ -8,7 +8,9 @@ const HOST = '0.0.0.0';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 app.use(cors({
@@ -17,81 +19,6 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
-
-// Initialize Database Schema
-async function initDB() {
-  const client = await pool.connect();
-  try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS classes (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL UNIQUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS students (
-        id SERIAL PRIMARY KEY,
-        class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        email TEXT,
-        roll_number TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(class_id, roll_number)
-      );
-
-      CREATE TABLE IF NOT EXISTS assignments (
-        id SERIAL PRIMARY KEY,
-        class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
-        title TEXT NOT NULL,
-        description TEXT,
-        deadline TIMESTAMP NOT NULL,
-        max_marks INTEGER DEFAULT 7,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS attendance (
-        id SERIAL PRIMARY KEY,
-        student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
-        assignment_id INTEGER,
-        date DATE NOT NULL,
-        status TEXT NOT NULL CHECK(status IN ('present_submitted', 'present_not_submitted', 'absent')),
-        marks_obtained REAL DEFAULT 0,
-        late_days INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS student_marks (
-        id SERIAL PRIMARY KEY,
-        student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
-        total_marks REAL DEFAULT 100,
-        marks_obtained REAL DEFAULT 0,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    console.log('Database tables initialized');
-  } finally {
-    client.release();
-  }
-}
-
-// Helper function to generate random unique roll number
-async function generateRandomRollNumber() {
-  let rollNumber;
-  let attempts = 0;
-  const maxAttempts = 100;
-  
-  while (attempts < maxAttempts) {
-    rollNumber = String(Math.floor(1000 + Math.random() * 9000));
-    const res = await pool.query('SELECT id FROM students WHERE roll_number = $1', [rollNumber]);
-    
-    if (res.rows.length === 0) {
-      return rollNumber;
-    }
-    attempts++;
-  }
-  
-  return rollNumber;
-}
 
 // ============ CLASS ROUTES ============
 
@@ -155,7 +82,7 @@ app.post('/api/classes/:classId/students', async (req, res) => {
     
     if (!name) return res.status(400).json({ error: 'Student name required' });
     
-    const rollNumber = await generateRandomRollNumber();
+    const rollNumber = String(Math.floor(1000 + Math.random() * 9000));
     
     await client.query('BEGIN');
     
@@ -208,7 +135,6 @@ app.delete('/api/students/:id', async (req, res) => {
   }
 });
 
-// Smart search by roll number
 app.get('/api/search/:rollNumber', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -298,24 +224,11 @@ app.post('/api/attendance', async (req, res) => {
       return res.status(400).json({ error: 'Student ID, date, and status required' });
     }
     
-    let assignment = null;
-    if (assignmentId) {
-      const result = await pool.query('SELECT * FROM assignments WHERE id = $1', [assignmentId]);
-      assignment = result.rows[0];
-    }
-    
     let marksObtained = 0;
     let lateDays = 0;
     
     if (status === 'present_submitted') {
       marksObtained = 7;
-    } else if (status === 'present_not_submitted' && assignment) {
-      const deadline = new Date(assignment.deadline);
-      const submissionDate = new Date(date);
-      if (submissionDate > deadline) {
-        lateDays = Math.ceil((submissionDate - deadline) / (1000 * 60 * 60 * 24));
-        marksObtained = Math.max(0, 7 - (lateDays * 0.5));
-      }
     }
     
     const existing = await pool.query(
@@ -363,16 +276,7 @@ app.post('/api/attendance/bulk', async (req, res) => {
     
     const students = await pool.query('SELECT id FROM students WHERE class_id = $1', [classId]);
     
-    let assignment = null;
-    if (assignmentId) {
-      const result = await pool.query('SELECT * FROM assignments WHERE id = $1', [assignmentId]);
-      assignment = result.rows[0];
-    }
-    
-    let marksObtained = 0;
-    if (status === 'present_submitted') {
-      marksObtained = 7;
-    }
+    let marksObtained = status === 'present_submitted' ? 7 : 0;
     
     for (const student of students.rows) {
       const existing = await pool.query(
@@ -479,7 +383,18 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.listen(PORT, HOST, async () => {
-  console.log(`Server running on http://0.0.0.0:${PORT}`);
-  await initDB();
-});
+// Start server with error handling
+async function startServer() {
+  try {
+    await pool.query('SELECT NOW()');
+    console.log('Database connected');
+  } catch (err) {
+    console.error('DB connection failed:', err.message);
+  }
+  
+  app.listen(PORT, HOST, () => {
+    console.log(`Server running on http://${HOST}:${PORT}`);
+  });
+}
+
+startServer();

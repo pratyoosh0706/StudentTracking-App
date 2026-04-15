@@ -2,5 +2,8 @@
   "framework": "vite",
   "buildCommand": "cd client && npm install && npm run build",
   "outputDirectory": "client/dist",
-  "installCommand": "cd client && npm install"
+  "installCommand": "cd client && npm install",
+  "env": {
+    "VITE_API_URL": "@student-admin-api-url"
+  }
 }
