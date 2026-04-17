@@ -137,6 +137,27 @@ app.put('/api/students/:id', async (req, res) => {
   }
 });
 
+app.put('/api/students/:id/marks', async (req, res) => {
+  try {
+    const { marks } = req.body;
+    
+    if (marks === undefined || marks === null) {
+      return res.status(400).json({ error: 'Marks value required' });
+    }
+    
+    const marksValue = Math.max(0, Math.min(100, Number(marks)));
+    
+    await pool.query(
+      'UPDATE student_marks SET marks_obtained = $1, updated_at = CURRENT_TIMESTAMP WHERE student_id = $2',
+      [marksValue, req.params.id]
+    );
+    
+    res.json({ success: true, marks_obtained: marksValue });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.delete('/api/students/:id', async (req, res) => {
   try {
     await pool.query('DELETE FROM students WHERE id = $1', [req.params.id]);

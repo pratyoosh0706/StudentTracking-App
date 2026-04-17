@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Mail, Calendar, FileText, Check, X, AlertTriangle } from 'lucide-react';
+import { Search, Mail, Calendar, FileText, Check, X, AlertTriangle, Edit2, Save } from 'lucide-react';
 import { api } from '../api';
 
 export default function SearchPage() {
@@ -10,6 +10,9 @@ export default function SearchPage() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [editingMarks, setEditingMarks] = useState(false);
+  const [manualMarks, setManualMarks] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const handleSearch = useCallback(async (roll) => {
     if (roll.length !== 4) {
@@ -88,6 +91,40 @@ export default function SearchPage() {
       default:
         return status;
     }
+  };
+
+  const handleEditMarks = () => {
+    setManualMarks(report?.marks_obtained?.toString() || '0');
+    setEditingMarks(true);
+  };
+
+  const handleSaveMarks = async () => {
+    if (!student) return;
+    
+    const marks = parseInt(manualMarks, 10);
+    if (isNaN(marks) || marks < 0 || marks > 100) {
+      alert('Please enter a valid number between 0 and 100');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const result = await api.put(`/students/${student.id}/marks`, { marks });
+      if (result.success) {
+        setReport({ ...report, marks_obtained: result.marks_obtained });
+        setEditingMarks(false);
+        alert('Marks updated successfully!');
+      }
+    } catch (error) {
+      alert('Failed to update marks: ' + error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMarks(false);
+    setManualMarks('');
   };
 
   return (
@@ -258,33 +295,79 @@ export default function SearchPage() {
           </div>
 
           <div className="card">
-            <h2 style={{ marginBottom: '16px' }}>Performance Summary</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-              <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '12px' }}>
-                <h4 style={{ color: 'var(--text-light)', marginBottom: '8px' }}>Total Marks Obtained</h4>
-                <p style={{ fontSize: '1.5rem', fontWeight: 700 }}>{report.marks_obtained}</p>
-              </div>
-              <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '12px' }}>
-                <h4 style={{ color: 'var(--text-light)', marginBottom: '8px' }}>Total Marks Available</h4>
-                <p style={{ fontSize: '1.5rem', fontWeight: 700 }}>{report.total_marks}</p>
-              </div>
-              <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '12px' }}>
-                <h4 style={{ color: 'var(--text-light)', marginBottom: '8px' }}>Percentage</h4>
-                <p style={{ fontSize: '1.5rem', fontWeight: 700 }}>
-                  {((report.marks_obtained / report.total_marks) * 100).toFixed(1)}%
-                </p>
-              </div>
-              <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '12px' }}>
-                <h4 style={{ color: 'var(--text-light)', marginBottom: '8px' }}>Grade</h4>
-                <p style={{ 
-                  fontSize: '1.5rem', 
-                  fontWeight: 700,
-                  color: getGradeColor(report.marks_obtained)
-                }}>
-                  {getGrade(report.marks_obtained)}
-                </p>
-              </div>
+            <div className="card-header">
+              <h2>Performance Summary</h2>
+              {!editingMarks && (
+                <button className="btn btn-secondary btn-sm" onClick={handleEditMarks}>
+                  <Edit2 size={16} /> Edit Marks
+                </button>
+              )}
             </div>
+            
+            {editingMarks ? (
+              <div style={{ padding: '20px', background: 'var(--bg)', borderRadius: '12px' }}>
+                <div className="form-group">
+                  <label>Enter Marks (0-100)</label>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={manualMarks}
+                      onChange={(e) => setManualMarks(e.target.value)}
+                      style={{ flex: 1 }}
+                      autoFocus
+                    />
+                    <button 
+                      className="btn btn-primary" 
+                      onClick={handleSaveMarks}
+                      disabled={saving}
+                    >
+                      <Save size={18} /> {saving ? 'Saving...' : 'Save'}
+                    </button>
+                    <button 
+                      className="btn btn-secondary" 
+                      onClick={handleCancelEdit}
+                      disabled={saving}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <p style={{ color: 'var(--text-light)', fontSize: '13px', marginTop: '8px' }}>
+                    Enter a value between 0 and 100
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                  <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '12px' }}>
+                    <h4 style={{ color: 'var(--text-light)', marginBottom: '8px' }}>Total Marks Obtained</h4>
+                    <p style={{ fontSize: '1.5rem', fontWeight: 700 }}>{report.marks_obtained}</p>
+                  </div>
+                  <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '12px' }}>
+                    <h4 style={{ color: 'var(--text-light)', marginBottom: '8px' }}>Total Marks Available</h4>
+                    <p style={{ fontSize: '1.5rem', fontWeight: 700 }}>{report.total_marks}</p>
+                  </div>
+                  <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '12px' }}>
+                    <h4 style={{ color: 'var(--text-light)', marginBottom: '8px' }}>Percentage</h4>
+                    <p style={{ fontSize: '1.5rem', fontWeight: 700 }}>
+                      {((report.marks_obtained / report.total_marks) * 100).toFixed(1)}%
+                    </p>
+                  </div>
+                  <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '12px' }}>
+                    <h4 style={{ color: 'var(--text-light)', marginBottom: '8px' }}>Grade</h4>
+                    <p style={{ 
+                      fontSize: '1.5rem', 
+                      fontWeight: 700,
+                      color: getGradeColor(report.marks_obtained)
+                    }}>
+                      {getGrade(report.marks_obtained)}
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </>
       )}
