@@ -278,18 +278,18 @@ app.post('/api/attendance', async (req, res) => {
       let deadline = null;
       
       if (deadlineDate) {
-        deadline = new Date(deadlineDate);
+        deadline = new Date(deadlineDate + 'T00:00:00');
       } else if (assignmentId) {
         const assignment = await pool.query('SELECT deadline FROM assignments WHERE id = $1', [assignmentId]);
         if (assignment.rows.length > 0) {
-          deadline = new Date(assignment.rows[0].deadline);
+          deadline = new Date(assignment.rows[0].deadline + 'T00:00:00');
         }
       }
       
-      const submissionDate = new Date(date);
+      const submissionDate = new Date(date + 'T00:00:00');
       
       if (deadline) {
-        const diffTime = submissionDate - deadline;
+        const diffTime = submissionDate.getTime() - deadline.getTime();
         lateDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         lateDays = Math.max(1, lateDays); // Minimum 1 day late
         const penalty = lateDays * 0.5;
@@ -340,18 +340,18 @@ app.post('/api/attendance/bulk', async (req, res) => {
       let deadline = null;
       
       if (deadlineDate) {
-        deadline = new Date(deadlineDate);
+        deadline = new Date(deadlineDate + 'T00:00:00');
       } else if (assignmentId) {
         const assignment = await pool.query('SELECT deadline FROM assignments WHERE id = $1', [assignmentId]);
         if (assignment.rows.length > 0) {
-          deadline = new Date(assignment.rows[0].deadline);
+          deadline = new Date(assignment.rows[0].deadline + 'T00:00:00');
         }
       }
       
-      const submissionDate = new Date(date);
+      const submissionDate = new Date(date + 'T00:00:00');
       
       if (deadline) {
-        const diffTime = submissionDate - deadline;
+        const diffTime = submissionDate.getTime() - deadline.getTime();
         lateDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         lateDays = Math.max(1, lateDays);
         const penalty = lateDays * 0.5;
