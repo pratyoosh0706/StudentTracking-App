@@ -221,29 +221,54 @@ export async function POST(req, res) {
     }
     
     if (path === '/api/attendance') {
-      const { studentId, assignmentId, date, status } = body;
+      const { studentId, assignmentId, date, status, deadlineDate } = body;
       if (!studentId || !date || !status) {
         return Response.json({ error: 'Required fields missing' }, { status: 400 });
       }
       
-      let marksObtained = status === 'present_submitted' ? 7 : 0;
+      let marksObtained = 0;
+      let lateDays = 0;
       
       const existing = await pool.query(`
-        SELECT * FROM attendance WHERE student_id = $1 AND date = $2
-      `, [studentId, date]);
+        SELECT * FROM attendance WHERE student_id = $1 AND date = $2 AND assignment_id = $3
+      `, [studentId, date, assignmentId || null]);
       
       if (existing.rows.length > 0) {
-        await pool.query(`
-          UPDATE attendance 
-          SET assignment_id = $1, status = $2, marks_obtained = $3, late_days = 0
-          WHERE id = $4
-        `, [assignmentId || null, status, marksObtained, existing.rows[0].id]);
-      } else {
-        await pool.query(`
-          INSERT INTO attendance (student_id, assignment_id, date, status, marks_obtained, late_days)
-          VALUES ($1, $2, $3, $4, $5, 0)
-        `, [studentId, assignmentId || null, date, status, marksObtained]);
+        return Response.json({ error: 'Attendance already marked for this assignment on this date' }, { status: 400 });
       }
+      
+      if (status === 'present_submitted') {
+        marksObtained = 7;
+      } else if (status === 'late_submission') {
+        let deadline = null;
+        
+        if (deadlineDate) {
+          deadline = new Date(deadlineDate + 'T00:00:00');
+        } else if (assignmentId) {
+          const assignment = await pool.query('SELECT deadline FROM assignments WHERE id = $1', [assignmentId]);
+          if (assignment.rows.length > 0) {
+            deadline = new Date(assignment.rows[0].deadline + 'T00:00:00');
+          }
+        }
+        
+        const submissionDate = new Date(date + 'T00:00:00');
+        
+        if (deadline) {
+          const diffTime = submissionDate.getTime() - deadline.getTime();
+          lateDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          lateDays = Math.max(1, lateDays);
+          const penalty = lateDays * 0.5;
+          marksObtained = Math.max(0, 7 - penalty);
+        } else {
+          marksObtained = 7;
+          lateDays = 0;
+        }
+      }
+      
+      await pool.query(`
+        INSERT INTO attendance (student_id, assignment_id, date, status, marks_obtained, late_days)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [studentId, assignmentId || null, date, status, marksObtained, lateDays]);
       
       const totalMarks = await pool.query(`
         SELECT COALESCE(SUM(marks_obtained), 0) as total FROM attendance WHERE student_id = $1
@@ -253,7 +278,7 @@ export async function POST(req, res) {
         UPDATE student_marks SET marks_obtained = $1, updated_at = CURRENT_TIMESTAMP WHERE student_id = $2
       `, [Math.min(totalMarks.rows[0].total, 100), studentId]);
       
-      return Response.json({ success: true, marksObtained });
+      return Response.json({ success: true, marksObtained, lateDays });
     }
     
     if (path === '/api/attendance/bulk') {
@@ -318,6 +343,24 @@ export async function PUT(req, res) {
       `, [name, email, studentId]);
       
       return Response.json({ success: true });
+    }
+    
+    const marksMatch = path.match(/^\/api\/students\/(\d+)\/marks$/);
+    if (marksMatch) {
+      const studentId = marksMatch[1];
+      const { marks } = body;
+      
+      if (marks === undefined || marks === null) {
+        return Response.json({ error: 'Marks value required' }, { status: 400 });
+      }
+      
+      const marksValue = Math.max(0, Math.min(100, Number(marks)));
+      
+      await pool.query(`
+        UPDATE student_marks SET marks_obtained = $1, updated_at = CURRENT_TIMESTAMP WHERE student_id = $2
+      `, [marksValue, studentId]);
+      
+      return Response.json({ success: true, marks_obtained: marksValue });
     }
     
     return Response.json({ error: 'Not found' }, { status: 404 });
