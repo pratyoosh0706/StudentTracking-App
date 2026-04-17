@@ -738,6 +738,7 @@ tbody tr:hover {
   border-radius: 14px;
   border: 1px solid var(--border);
   transition: all 0.3s ease-out;
+  overflow: hidden;
 }
 
 .class-card:hover {
@@ -746,9 +747,16 @@ tbody tr:hover {
   transform: translateX(4px);
 }
 
+.class-card > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
 .class-card h3 {
   font-size: 1.15rem;
   margin-bottom: 6px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .class-card p {
@@ -759,6 +767,7 @@ tbody tr:hover {
 .class-actions {
   display: flex;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .student-card {
@@ -986,10 +995,11 @@ tbody tr:hover {
   display: none;
 }
 
-@media (max-width: 768px) {
+  @media (max-width: 768px) {
   .sidebar {
     position: fixed;
-    width: 300px;
+    width: 85%;
+    max-width: 320px;
     transform: translateX(-100%);
     z-index: 1001;
     transition: transform 0.3s ease-out;
@@ -1253,13 +1263,26 @@ tbody tr:hover {
   
   .class-card {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 14px;
+    align-items: stretch;
+    gap: 16px;
+    padding: 20px;
+  }
+  
+  .class-card > div:first-child {
+    text-align: center;
   }
   
   .class-actions {
     width: 100%;
-    justify-content: flex-end;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .class-actions a,
+  .class-actions button {
+    flex: 1;
+    min-width: 120px;
+    justify-content: center;
   }
   
   .student-roll {
