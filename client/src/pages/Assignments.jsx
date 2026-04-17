@@ -1,21 +1,18 @@
 import { useState, useEffect } from 'react';
 import { FileText, Trash2, Calendar } from 'lucide-react';
-
-import { API_URL } from '../config';
+import { api } from '../api';
 
 export default function Assignments() {
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchAssignments = async () => {
-    try {
-      const classesRes = await fetch(`${API_URL}/classes`);
-      const classes = await classesRes.json();
-      
+  useEffect(() => {
+    const fetchAssignments = async () => {
+      const classes = await api.get('/classes');
       const allAssignments = [];
+      
       for (const cls of classes) {
-        const res = await fetch(`${API_URL}/classes/${cls.id}/assignments`);
-        const data = await res.json();
+        const data = await api.get(`/classes/${cls.id}/assignments`);
         data.forEach(a => {
           allAssignments.push({ ...a, class_name: cls.name });
         });
@@ -23,29 +20,28 @@ export default function Assignments() {
       
       allAssignments.sort((a, b) => new Date(b.deadline) - new Date(a.deadline));
       setAssignments(allAssignments);
-    } catch {
-      console.error('Failed to fetch assignments');
-    } finally {
       setLoading(false);
-    }
-  };
-
-  useEffect(() => {
+    };
     fetchAssignments();
   }, []);
 
   const handleDelete = async (assignmentId) => {
     if (!confirm('Are you sure?')) return;
-
-    await fetch(`${API_URL}/assignments/${assignmentId}`, { method: 'DELETE' });
-    fetchAssignments();
+    await api.delete(`/assignments/${assignmentId}`);
+    setAssignments(assignments.filter(a => a.id !== assignmentId));
   };
 
   const isOverdue = (deadline) => {
     return new Date(deadline) < new Date();
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner loading-spinner-lg"></div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -62,7 +58,8 @@ export default function Assignments() {
         {assignments.length === 0 ? (
           <div className="empty-state">
             <FileText size={48} />
-            <p>No assignments yet. Create a class first, then add assignments.</p>
+            <h3>No Assignments Yet</h3>
+            <p>Create a class first, then add assignments.</p>
           </div>
         ) : (
           <table>

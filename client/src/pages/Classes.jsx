@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Plus, Users, Trash2, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
-import { API_URL } from '../config';
+import { api } from '../api';
 
 export default function Classes() {
   const [classes, setClasses] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [newClass, setNewClass] = useState('');
 
   const fetchClasses = async () => {
-    const res = await fetch(`${API_URL}/classes`);
-    const data = await res.json();
+    setLoading(true);
+    const data = await api.get('/classes');
     setClasses(data);
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -24,32 +25,28 @@ export default function Classes() {
     if (!newClass.trim()) return;
 
     try {
-      const res = await fetch(`${API_URL}/classes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newClass }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setClasses([data, ...classes]);
-        setNewClass('');
-        setShowModal(false);
-      } else {
-        const error = await res.json();
-        alert(error.error);
-      }
-    } catch {
-      alert('Failed to create class');
+      const data = await api.post('/classes', { name: newClass });
+      setClasses([data, ...classes]);
+      setNewClass('');
+      setShowModal(false);
+    } catch (error) {
+      alert(error.message);
     }
   };
 
   const handleDeleteClass = async (id) => {
     if (!confirm('Are you sure? This will delete all students and assignments in this class.')) return;
-
-    await fetch(`${API_URL}/classes/${id}`, { method: 'DELETE' });
+    await api.delete(`/classes/${id}`);
     setClasses(classes.filter(c => c.id !== id));
   };
+
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner loading-spinner-lg"></div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -69,7 +66,8 @@ export default function Classes() {
         {classes.length === 0 ? (
           <div className="empty-state">
             <Users size={48} />
-            <p>No classes yet. Create your first class to get started.</p>
+            <h3>No Classes Yet</h3>
+            <p>Create your first class to get started.</p>
           </div>
         ) : (
           <div className="class-list">

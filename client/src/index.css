@@ -1,3 +1,5 @@
+@import 'nprogress/nprogress.css';
+
 * {
   margin: 0;
   padding: 0;
@@ -13,4 +15,19 @@ body {
 
 #root {
   min-height: 100vh;
+}
+
+#nprogress .bar {
+  background: linear-gradient(135deg, #0052FF, #4D7CFF) !important;
+  height: 3px !important;
+  box-shadow: 0 0 8px rgba(0, 82, 255, 0.4) !important;
+}
+
+#nprogress .peg {
+  box-shadow: 0 0 10px #0052FF, 0 0 5px #0052FF !important;
+}
+
+#nprogress .spinner-icon {
+  border-top-color: #0052FF !important;
+  border-left-color: #0052FF !important;
 }

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Search, Check, X, AlertTriangle } from 'lucide-react';
-
-import { API_URL } from '../config';
+import { api } from '../api';
 
 export default function Attendance() {
   const [rollNumber, setRollNumber] = useState('');
@@ -12,13 +11,15 @@ export default function Attendance() {
   const [status, setStatus] = useState('present_submitted');
   const [recentAttendance, setRecentAttendance] = useState([]);
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
-    fetch(`${API_URL}/attendance/${today}`)
-      .then(res => res.json())
-      .then(data => setRecentAttendance(data))
-      .catch(() => {});
+    const fetchRecent = async () => {
+      const data = await api.get(`/attendance/${today}`).catch(() => []);
+      setRecentAttendance(data);
+    };
+    fetchRecent();
   }, []);
 
   const handleSearch = async () => {
@@ -28,21 +29,27 @@ export default function Attendance() {
       return;
     }
 
-    const res = await fetch(`${API_URL}/search/${rollNumber}`);
-    const data = await res.json();
+    setLoading(true);
+    setMessage('');
 
-    if (data) {
-      setStudent(data);
-      setSelectedAssignment('');
-      
-      const assignmentsRes = await fetch(`${API_URL}/classes/${data.class_id}/assignments`);
-      const assignmentsData = await assignmentsRes.json();
-      setAssignments(assignmentsData);
-      
-      setMessage('');
-    } else {
+    try {
+      const data = await api.get(`/search/${rollNumber}`);
+
+      if (data) {
+        setStudent(data);
+        setSelectedAssignment('');
+        
+        const assignmentsData = await api.get(`/classes/${data.class_id}/assignments`);
+        setAssignments(assignmentsData);
+      } else {
+        setStudent(null);
+        setMessage('Student not found');
+      }
+    } catch {
       setStudent(null);
       setMessage('Student not found');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -51,34 +58,22 @@ export default function Attendance() {
     
     if (!student || !date) return;
 
-    try {
-      const res = await fetch(`${API_URL}/attendance`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentId: student.id,
-          assignmentId: selectedAssignment || null,
-          date,
-          status,
-        }),
-      });
+    const result = await api.post('/attendance', {
+      studentId: student.id,
+      assignmentId: selectedAssignment || null,
+      date,
+      status,
+    });
 
-      if (res.ok) {
-        const result = await res.json();
-        alert(`Attendance marked! ${result.marksObtained > 0 ? `+${result.marksObtained} marks` : 'No marks'}`);
-        
-        const today = new Date().toISOString().split('T')[0];
-        const attendanceRes = await fetch(`${API_URL}/attendance/${today}`);
-        const attendanceData = await attendanceRes.json();
-        setRecentAttendance(attendanceData);
-        
-        setStudent(null);
-        setRollNumber('');
-        setSelectedAssignment('');
-      }
-    } catch {
-      alert('Failed to mark attendance');
-    }
+    alert(`Attendance marked! ${result.marksObtained > 0 ? `+${result.marksObtained} marks` : 'No marks'}`);
+    
+    const today = new Date().toISOString().split('T')[0];
+    const attendanceData = await api.get(`/attendance/${today}`);
+    setRecentAttendance(attendanceData);
+    
+    setStudent(null);
+    setRollNumber('');
+    setSelectedAssignment('');
   };
 
   return (
@@ -108,12 +103,13 @@ export default function Attendance() {
             className="btn btn-primary" 
             style={{ width: '100%', marginTop: '12px' }}
             onClick={handleSearch}
+            disabled={loading}
           >
-            <Search size={18} /> Search Student
+            <Search size={18} /> {loading ? 'Searching...' : 'Search Student'}
           </button>
 
           {message && (
-            <div style={{ marginTop: '12px', padding: '12px', background: '#fee2e2', borderRadius: '8px', color: '#991b1b' }}>
+            <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(239,68,68,0.1)', borderRadius: '8px', color: '#991b1b' }}>
               {message}
             </div>
           )}

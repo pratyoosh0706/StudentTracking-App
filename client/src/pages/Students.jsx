@@ -1,37 +1,34 @@
 import { useState, useEffect } from 'react';
 import { GraduationCap, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
-import { API_URL } from '../config';
+import { api } from '../api';
 
 export default function Students() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchStudents = async () => {
-    try {
-      const res = await fetch(`${API_URL}/students`);
-      const data = await res.json();
-      setStudents(data);
-    } catch {
-      console.error('Failed to fetch students');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchStudents = async () => {
+      const data = await api.get('/students');
+      setStudents(data);
+      setLoading(false);
+    };
     fetchStudents();
   }, []);
 
   const handleDeleteStudent = async (studentId) => {
     if (!confirm('Are you sure you want to delete this student?')) return;
-
-    await fetch(`${API_URL}/students/${studentId}`, { method: 'DELETE' });
-    fetchStudents();
+    await api.delete(`/students/${studentId}`);
+    setStudents(students.filter(s => s.id !== studentId));
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner loading-spinner-lg"></div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -48,7 +45,8 @@ export default function Students() {
         {students.length === 0 ? (
           <div className="empty-state">
             <GraduationCap size={48} />
-            <p>No students yet. Create a class first, then add students.</p>
+            <h3>No Students Yet</h3>
+            <p>Create a class first, then add students.</p>
           </div>
         ) : (
           <table>

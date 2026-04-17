@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { BarChart3 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
-import { API_URL } from '../config';
+import { api } from '../api';
 
 export default function Reports() {
   const [classes, setClasses] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [report, setReport] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [overallStats, setOverallStats] = useState({
     totalStudents: 0,
     totalMarks: 0,
@@ -16,17 +16,17 @@ export default function Reports() {
   });
 
   const fetchClasses = useCallback(async () => {
-    const res = await fetch(`${API_URL}/classes`);
-    const data = await res.json();
+    const data = await api.get('/classes');
     setClasses(data);
     if (data.length > 0) {
       setSelectedClass(data[0].id);
     }
+    setLoading(false);
   }, []);
 
   const fetchReport = useCallback(async (classId) => {
-    const res = await fetch(`${API_URL}/classes/${classId}/report`);
-    const data = await res.json();
+    setLoading(true);
+    const data = await api.get(`/classes/${classId}/report`);
     setReport(data);
     
     const totalStudents = data.length;
@@ -35,6 +35,7 @@ export default function Reports() {
     const below50 = data.filter(s => (s.marks_obtained || 0) < 50).length;
     
     setOverallStats({ totalStudents, totalMarks, avgMarks, below50 });
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -61,6 +62,14 @@ export default function Reports() {
     if (marks >= 50) return 'var(--warning)';
     return 'var(--danger)';
   };
+
+  if (loading && classes.length === 0) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner loading-spinner-lg"></div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -170,7 +179,8 @@ export default function Reports() {
         <div className="card">
           <div className="empty-state">
             <BarChart3 size={48} />
-            <p>No data available for this class</p>
+            <h3>No Data Available</h3>
+            <p>No data available for this class yet.</p>
           </div>
         </div>
       )}
@@ -179,7 +189,8 @@ export default function Reports() {
         <div className="card">
           <div className="empty-state">
             <BarChart3 size={48} />
-            <p>No classes available. Create a class first.</p>
+            <h3>No Classes</h3>
+            <p>Create a class first to view reports.</p>
           </div>
         </div>
       )}

@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, Mail, Calendar, FileText, Check, X, AlertTriangle } from 'lucide-react';
-
-import { API_URL } from '../config';
+import { api } from '../api';
 
 export default function SearchPage() {
   const [searchParams] = useSearchParams();
@@ -24,14 +23,11 @@ export default function SearchPage() {
     setMessage('');
 
     try {
-      const studentRes = await fetch(`${API_URL}/search/${roll}`);
-      const studentData = await studentRes.json();
+      const studentData = await api.get(`/search/${roll}`);
 
       if (studentData) {
         setStudent(studentData);
-        
-        const reportRes = await fetch(`${API_URL}/students/${studentData.id}/report`);
-        const reportData = await reportRes.json();
+        const reportData = await api.get(`/students/${studentData.id}/report`);
         setReport(reportData);
       } else {
         setStudent(null);
@@ -128,8 +124,8 @@ export default function SearchPage() {
           <div style={{ 
             marginTop: '20px', 
             padding: '16px', 
-            background: '#fee2e2', 
-            borderRadius: '8px', 
+            background: 'rgba(239,68,68,0.1)', 
+            borderRadius: '12px', 
             color: '#991b1b',
             textAlign: 'center'
           }}>
@@ -255,6 +251,7 @@ export default function SearchPage() {
             ) : (
               <div className="empty-state">
                 <FileText size={48} />
+                <h3>No Records</h3>
                 <p>No attendance records found</p>
               </div>
             )}
@@ -263,21 +260,21 @@ export default function SearchPage() {
           <div className="card">
             <h2 style={{ marginBottom: '16px' }}>Performance Summary</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-              <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '8px' }}>
+              <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '12px' }}>
                 <h4 style={{ color: 'var(--text-light)', marginBottom: '8px' }}>Total Marks Obtained</h4>
                 <p style={{ fontSize: '1.5rem', fontWeight: 700 }}>{report.marks_obtained}</p>
               </div>
-              <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '8px' }}>
+              <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '12px' }}>
                 <h4 style={{ color: 'var(--text-light)', marginBottom: '8px' }}>Total Marks Available</h4>
                 <p style={{ fontSize: '1.5rem', fontWeight: 700 }}>{report.total_marks}</p>
               </div>
-              <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '8px' }}>
+              <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '12px' }}>
                 <h4 style={{ color: 'var(--text-light)', marginBottom: '8px' }}>Percentage</h4>
                 <p style={{ fontSize: '1.5rem', fontWeight: 700 }}>
                   {((report.marks_obtained / report.total_marks) * 100).toFixed(1)}%
                 </p>
               </div>
-              <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '8px' }}>
+              <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '12px' }}>
                 <h4 style={{ color: 'var(--text-light)', marginBottom: '8px' }}>Grade</h4>
                 <p style={{ 
                   fontSize: '1.5rem', 
