@@ -4,6 +4,13 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -11,10 +18,22 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
 #root {
   min-height: 100vh;
+}
+
+input, select, textarea, button {
+  font-size: 16px !important;
+}
+
+@media (max-width: 768px) {
+  html {
+    font-size: 14px;
+  }
 }
 
 #nprogress .bar {
