@@ -12,6 +12,8 @@ export default function Attendance() {
   const [recentAttendance, setRecentAttendance] = useState([]);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [lateDeadline, setLateDeadline] = useState('');
+  const [lateSubmissionDate, setLateSubmissionDate] = useState(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -58,16 +60,35 @@ export default function Attendance() {
     
     if (!student || !date) return;
 
+    let submissionDate = date;
+    let deadlineDate = lateDeadline;
+
+    if (status === 'late_submission') {
+      submissionDate = lateSubmissionDate;
+      deadlineDate = lateDeadline;
+      
+      if (!submissionDate || !deadlineDate) {
+        alert('Please enter both Submission Date and Deadline Date for late submission');
+        return;
+      }
+    }
+
     try {
       const result = await api.post('/attendance', {
         studentId: student.id,
         assignmentId: selectedAssignment || null,
-        date,
+        date: submissionDate,
+        deadlineDate: deadlineDate,
         status,
       });
 
-      const lateInfo = result.lateDays > 0 ? ` (${result.lateDays} day${result.lateDays > 1 ? 's' : ''} late)` : '';
-      alert(`Attendance marked! ${result.marksObtained > 0 ? `+${result.marksObtained} marks${lateInfo}` : 'No marks'}`);
+      if (status === 'late_submission' && result.lateDays > 0) {
+        alert(`Late submission recorded! ${result.lateDays} day(s) late, ${result.marksObtained.toFixed(1)} marks awarded`);
+      } else if (status === 'late_submission') {
+        alert(`Submission recorded! ${result.marksObtained.toFixed(1)} marks awarded`);
+      } else {
+        alert(`Attendance marked! ${result.marksObtained > 0 ? `+${result.marksObtained} marks` : 'No marks'}`);
+      }
       
       const today = new Date().toISOString().split('T')[0];
       const attendanceData = await api.get(`/attendance/${today}`);
@@ -77,6 +98,8 @@ export default function Attendance() {
       setRollNumber('');
       setSelectedAssignment('');
       setStatus('present_submitted');
+      setLateDeadline('');
+      setLateSubmissionDate(new Date().toISOString().split('T')[0]);
     } catch (error) {
       alert(error.message);
     }
@@ -134,15 +157,38 @@ export default function Attendance() {
 
           {student && (
             <form onSubmit={handleMarkAttendance} style={{ marginTop: '20px' }}>
-              <div className="form-group">
-                <label>Date</label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={e => setDate(e.target.value)}
-                  required
-                />
-              </div>
+              {status === 'late_submission' ? (
+                <>
+                  <div className="form-group">
+                    <label>Submission Date</label>
+                    <input
+                      type="date"
+                      value={lateSubmissionDate}
+                      onChange={e => setLateSubmissionDate(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Deadline Date</label>
+                    <input
+                      type="date"
+                      value={lateDeadline}
+                      onChange={e => setLateDeadline(e.target.value)}
+                      required
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="form-group">
+                  <label>Date</label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={e => setDate(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
 
               <div className="form-group">
                 <label>Assignment (Optional)</label>
@@ -241,7 +287,7 @@ export default function Attendance() {
         <h2 style={{ marginBottom: '20px' }}>Attendance Rules</h2>
         <ul style={{ color: 'var(--text-light)', paddingLeft: '20px' }}>
           <li><strong>On Time Submission:</strong> Full marks (+7) if submitted before or on deadline</li>
-          <li><strong>Late Submission:</strong> -0.5 marks per day late (deducted from max 100)</li>
+          <li><strong>Late Submission:</strong> Enter submission date and deadline date. Days late × 0.5 = marks deducted from 7</li>
           <li><strong>Absent:</strong> 0 marks</li>
           <li><strong>Maximum marks:</strong> 100 per year (cap applied)</li>
           <li><strong>No duplicates:</strong> Cannot submit the same assignment twice</li>

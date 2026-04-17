@@ -250,7 +250,7 @@ app.get('/api/attendance/:date', async (req, res) => {
 
 app.post('/api/attendance', async (req, res) => {
   try {
-    const { studentId, assignmentId, date, status } = req.body;
+    const { studentId, assignmentId, date, status, deadlineDate } = req.body;
     
     if (!studentId || !date || !status) {
       return res.status(400).json({ error: 'Student ID, date, and status required' });
@@ -271,37 +271,33 @@ app.post('/api/attendance', async (req, res) => {
       });
     }
     
-    // Get assignment deadline if assignmentId provided
-    let assignmentDeadline = null;
-    if (assignmentId) {
-      const assignment = await pool.query('SELECT deadline FROM assignments WHERE id = $1', [assignmentId]);
-      if (assignment.rows.length > 0) {
-        assignmentDeadline = new Date(assignment.rows[0].deadline);
-      }
-    }
-    
     if (status === 'present_submitted') {
       marksObtained = 7;
-      
-      // Calculate late days if submission is after deadline
-      const submissionDate = new Date(date);
-      if (assignmentDeadline && submissionDate > assignmentDeadline) {
-        const diffTime = submissionDate - assignmentDeadline;
-        lateDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        const penalty = lateDays * 0.5;
-        marksObtained = Math.max(0, 7 - penalty);
-      }
     } else if (status === 'late_submission') {
-      // Late submission - calculate penalty from assignment deadline
-      if (assignmentDeadline) {
-        const submissionDate = new Date(date);
-        const diffTime = submissionDate - assignmentDeadline;
+      // Late submission - use deadlineDate if provided, otherwise use assignment deadline
+      let deadline = null;
+      
+      if (deadlineDate) {
+        deadline = new Date(deadlineDate);
+      } else if (assignmentId) {
+        const assignment = await pool.query('SELECT deadline FROM assignments WHERE id = $1', [assignmentId]);
+        if (assignment.rows.length > 0) {
+          deadline = new Date(assignment.rows[0].deadline);
+        }
+      }
+      
+      const submissionDate = new Date(date);
+      
+      if (deadline) {
+        const diffTime = submissionDate - deadline;
         lateDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        lateDays = Math.max(1, lateDays); // Minimum 1 day late
         const penalty = lateDays * 0.5;
         marksObtained = Math.max(0, 7 - penalty);
       } else {
-        // No deadline, use date difference from assignment creation
+        // No deadline available
         marksObtained = 7;
+        lateDays = 0;
       }
     }
     
@@ -327,7 +323,7 @@ app.post('/api/attendance', async (req, res) => {
 
 app.post('/api/attendance/bulk', async (req, res) => {
   try {
-    const { classId, assignmentId, date, status } = req.body;
+    const { classId, assignmentId, date, status, deadlineDate } = req.body;
     
     if (!classId || !date || !status) {
       return res.status(400).json({ error: 'Class ID, date, and status required' });
@@ -335,42 +331,34 @@ app.post('/api/attendance/bulk', async (req, res) => {
     
     const students = await pool.query('SELECT id FROM students WHERE class_id = $1', [classId]);
     
-    // Get assignment deadline if assignmentId provided
-    let assignmentDeadline = null;
     let lateDays = 0;
     let marksObtained = 0;
     
-    if (assignmentId) {
-      const assignment = await pool.query('SELECT deadline FROM assignments WHERE id = $1', [assignmentId]);
-      if (assignment.rows.length > 0) {
-        assignmentDeadline = new Date(assignment.rows[0].deadline);
+    if (status === 'present_submitted') {
+      marksObtained = 7;
+    } else if (status === 'late_submission') {
+      let deadline = null;
+      
+      if (deadlineDate) {
+        deadline = new Date(deadlineDate);
+      } else if (assignmentId) {
+        const assignment = await pool.query('SELECT deadline FROM assignments WHERE id = $1', [assignmentId]);
+        if (assignment.rows.length > 0) {
+          deadline = new Date(assignment.rows[0].deadline);
+        }
       }
-    }
-    
-    // Calculate marks and late days
-    if (status === 'present_submitted' || status === 'late_submission') {
+      
       const submissionDate = new Date(date);
       
-      if (status === 'present_submitted') {
-        marksObtained = 7;
-        
-        // Check for late submission
-        if (assignmentDeadline && submissionDate > assignmentDeadline) {
-          const diffTime = submissionDate - assignmentDeadline;
-          lateDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          const penalty = lateDays * 0.5;
-          marksObtained = Math.max(0, 7 - penalty);
-        }
+      if (deadline) {
+        const diffTime = submissionDate - deadline;
+        lateDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        lateDays = Math.max(1, lateDays);
+        const penalty = lateDays * 0.5;
+        marksObtained = Math.max(0, 7 - penalty);
       } else {
-        // late_submission
-        if (assignmentDeadline) {
-          const diffTime = submissionDate - assignmentDeadline;
-          lateDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          const penalty = lateDays * 0.5;
-          marksObtained = Math.max(0, 7 - penalty);
-        } else {
-          marksObtained = 7;
-        }
+        marksObtained = 7;
+        lateDays = 0;
       }
     }
     
@@ -386,7 +374,7 @@ app.post('/api/attendance/bulk', async (req, res) => {
       
       if (existing.rows.length > 0) {
         skippedCount++;
-        continue; // Skip if already marked
+        continue;
       }
       
       await pool.query(`

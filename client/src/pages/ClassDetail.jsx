@@ -17,6 +17,8 @@ export default function ClassDetail() {
   const [assignmentForm, setAssignmentForm] = useState({ title: '', description: '', deadline: '' });
   const [bulkStatus, setBulkStatus] = useState('present_submitted');
   const [bulkAssignment, setBulkAssignment] = useState('');
+  const [bulkLateDeadline, setBulkLateDeadline] = useState('');
+  const [bulkLateSubmission, setBulkLateSubmission] = useState(new Date().toISOString().split('T')[0]);
 
   const fetchClass = async () => {
     const data = await api.get('/classes');
@@ -88,16 +90,37 @@ export default function ClassDetail() {
   const handleBulkAttendance = async (e) => {
     e.preventDefault();
     
-    const today = new Date().toISOString().split('T')[0];
-    await api.post('/attendance/bulk', {
+    let submissionDate = new Date().toISOString().split('T')[0];
+    let deadlineDate = null;
+
+    if (bulkStatus === 'late_submission') {
+      submissionDate = bulkLateSubmission;
+      deadlineDate = bulkLateDeadline;
+      
+      if (!submissionDate || !deadlineDate) {
+        alert('Please enter both Submission Date and Deadline Date for late submission');
+        return;
+      }
+    }
+
+    const result = await api.post('/attendance/bulk', {
       classId: id,
       assignmentId: bulkAssignment || null,
-      date: today,
+      date: submissionDate,
+      deadlineDate,
       status: bulkStatus,
     });
 
-    alert('Bulk attendance marked successfully!');
+    if (bulkStatus === 'late_submission' && result.lateDays > 0) {
+      alert(`Bulk attendance marked! ${result.updated} students marked late (${result.lateDays} day(s) late, ${result.marksPerStudent.toFixed(1)} marks each)`);
+    } else {
+      alert(`Bulk attendance marked successfully! ${result.updated} students updated`);
+    }
+    
     setShowBulkModal(false);
+    setBulkStatus('present_submitted');
+    setBulkLateDeadline('');
+    setBulkLateSubmission(new Date().toISOString().split('T')[0]);
   };
 
   if (loading) {
@@ -325,6 +348,28 @@ export default function ClassDetail() {
               <button className="close-btn" onClick={() => setShowBulkModal(false)}>&times;</button>
             </div>
             <form onSubmit={handleBulkAttendance}>
+              {bulkStatus === 'late_submission' ? (
+                <>
+                  <div className="form-group">
+                    <label>Submission Date</label>
+                    <input
+                      type="date"
+                      value={bulkLateSubmission}
+                      onChange={e => setBulkLateSubmission(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Deadline Date</label>
+                    <input
+                      type="date"
+                      value={bulkLateDeadline}
+                      onChange={e => setBulkLateDeadline(e.target.value)}
+                      required
+                    />
+                  </div>
+                </>
+              ) : null}
               <div className="form-group">
                 <label>Assignment (Optional)</label>
                 <select value={bulkAssignment} onChange={e => setBulkAssignment(e.target.value)}>
