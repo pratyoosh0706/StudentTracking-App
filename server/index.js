@@ -1,10 +1,13 @@
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
+const nprogress = require('nprogress');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const HOST = '0.0.0.0';
+
+nprogress.configure({ showSpinner: false, trickleSpeed: 100 });
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -19,6 +22,14 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+
+app.use((req, res, next) => {
+  nprogress.start();
+  res.on('finish', () => {
+    nprogress.done();
+  });
+  next();
+});
 
 // ============ CLASS ROUTES ============
 
