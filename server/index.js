@@ -259,31 +259,58 @@ app.post('/api/attendance', async (req, res) => {
     let marksObtained = 0;
     let lateDays = 0;
     
-    if (status === 'present_submitted') {
-      marksObtained = 7;
-    }
-    
+    // Check for existing attendance with the same student, date, and assignment
     const existing = await pool.query(
-      'SELECT * FROM attendance WHERE student_id = $1 AND date = $2',
-      [studentId, date]
+      'SELECT * FROM attendance WHERE student_id = $1 AND date = $2 AND assignment_id = $3',
+      [studentId, date, assignmentId || null]
     );
     
-    let result;
     if (existing.rows.length > 0) {
-      await pool.query(`
-        UPDATE attendance 
-        SET assignment_id = $1, status = $2, marks_obtained = $3, late_days = $4
-        WHERE id = $5
-      `, [assignmentId || null, status, marksObtained, lateDays, existing.rows[0].id]);
-      result = existing.rows[0].id;
-    } else {
-      const res2 = await pool.query(`
-        INSERT INTO attendance (student_id, assignment_id, date, status, marks_obtained, late_days)
-        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id
-      `, [studentId, assignmentId || null, date, status, marksObtained, lateDays]);
-      result = res2.rows[0].id;
+      return res.status(400).json({ 
+        error: 'Attendance already marked for this assignment on this date. Cannot submit again.' 
+      });
     }
     
+    // Get assignment deadline if assignmentId provided
+    let assignmentDeadline = null;
+    if (assignmentId) {
+      const assignment = await pool.query('SELECT deadline FROM assignments WHERE id = $1', [assignmentId]);
+      if (assignment.rows.length > 0) {
+        assignmentDeadline = new Date(assignment.rows[0].deadline);
+      }
+    }
+    
+    if (status === 'present_submitted') {
+      marksObtained = 7;
+      
+      // Calculate late days if submission is after deadline
+      const submissionDate = new Date(date);
+      if (assignmentDeadline && submissionDate > assignmentDeadline) {
+        const diffTime = submissionDate - assignmentDeadline;
+        lateDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const penalty = lateDays * 0.5;
+        marksObtained = Math.max(0, 7 - penalty);
+      }
+    } else if (status === 'late_submission') {
+      // Late submission - calculate penalty from assignment deadline
+      if (assignmentDeadline) {
+        const submissionDate = new Date(date);
+        const diffTime = submissionDate - assignmentDeadline;
+        lateDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const penalty = lateDays * 0.5;
+        marksObtained = Math.max(0, 7 - penalty);
+      } else {
+        // No deadline, use date difference from assignment creation
+        marksObtained = 7;
+      }
+    }
+    
+    const res2 = await pool.query(`
+      INSERT INTO attendance (student_id, assignment_id, date, status, marks_obtained, late_days)
+      VALUES ($1, $2, $3, $4, $5, $6) RETURNING id
+    `, [studentId, assignmentId || null, date, status, marksObtained, lateDays]);
+    
+    // Calculate total marks capped at 100
     const totalMarks = await pool.query(`
       SELECT COALESCE(SUM(marks_obtained), 0) as total FROM attendance WHERE student_id = $1
     `, [studentId]);
@@ -292,7 +319,7 @@ app.post('/api/attendance', async (req, res) => {
       UPDATE student_marks SET marks_obtained = $1, updated_at = CURRENT_TIMESTAMP WHERE student_id = $2
     `, [Math.min(totalMarks.rows[0].total, 100), studentId]);
     
-    res.json({ success: true, marksObtained });
+    res.json({ success: true, marksObtained, lateDays });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -308,26 +335,68 @@ app.post('/api/attendance/bulk', async (req, res) => {
     
     const students = await pool.query('SELECT id FROM students WHERE class_id = $1', [classId]);
     
-    let marksObtained = status === 'present_submitted' ? 7 : 0;
+    // Get assignment deadline if assignmentId provided
+    let assignmentDeadline = null;
+    let lateDays = 0;
+    let marksObtained = 0;
+    
+    if (assignmentId) {
+      const assignment = await pool.query('SELECT deadline FROM assignments WHERE id = $1', [assignmentId]);
+      if (assignment.rows.length > 0) {
+        assignmentDeadline = new Date(assignment.rows[0].deadline);
+      }
+    }
+    
+    // Calculate marks and late days
+    if (status === 'present_submitted' || status === 'late_submission') {
+      const submissionDate = new Date(date);
+      
+      if (status === 'present_submitted') {
+        marksObtained = 7;
+        
+        // Check for late submission
+        if (assignmentDeadline && submissionDate > assignmentDeadline) {
+          const diffTime = submissionDate - assignmentDeadline;
+          lateDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          const penalty = lateDays * 0.5;
+          marksObtained = Math.max(0, 7 - penalty);
+        }
+      } else {
+        // late_submission
+        if (assignmentDeadline) {
+          const diffTime = submissionDate - assignmentDeadline;
+          lateDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          const penalty = lateDays * 0.5;
+          marksObtained = Math.max(0, 7 - penalty);
+        } else {
+          marksObtained = 7;
+        }
+      }
+    }
+    
+    let updatedCount = 0;
+    let skippedCount = 0;
     
     for (const student of students.rows) {
+      // Check for existing attendance
       const existing = await pool.query(
-        'SELECT * FROM attendance WHERE student_id = $1 AND date = $2',
-        [student.id, date]
+        'SELECT * FROM attendance WHERE student_id = $1 AND date = $2 AND assignment_id = $3',
+        [student.id, date, assignmentId || null]
       );
       
       if (existing.rows.length > 0) {
-        await pool.query(`
-          UPDATE attendance SET assignment_id = $1, status = $2, marks_obtained = $3, late_days = 0
-          WHERE id = $4
-        `, [assignmentId || null, status, marksObtained, existing.rows[0].id]);
-      } else {
-        await pool.query(`
-          INSERT INTO attendance (student_id, assignment_id, date, status, marks_obtained, late_days)
-          VALUES ($1, $2, $3, $4, $5, 0)
-        `, [student.id, assignmentId || null, date, status, marksObtained]);
+        skippedCount++;
+        continue; // Skip if already marked
       }
       
+      await pool.query(`
+        INSERT INTO attendance (student_id, assignment_id, date, status, marks_obtained, late_days)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [student.id, assignmentId || null, date, status, marksObtained, lateDays]);
+      
+      updatedCount++;
+      
+      // Calculate total marks capped at 100
       const totalMarks = await pool.query(`
         SELECT COALESCE(SUM(marks_obtained), 0) as total FROM attendance WHERE student_id = $1
       `, [student.id]);
@@ -337,7 +406,14 @@ app.post('/api/attendance/bulk', async (req, res) => {
       `, [Math.min(totalMarks.rows[0].total, 100), student.id]);
     }
     
-    res.json({ success: true, count: students.rows.length });
+    res.json({ 
+      success: true, 
+      count: students.rows.length,
+      updated: updatedCount,
+      skipped: skippedCount,
+      marksPerStudent: marksObtained,
+      lateDays: lateDays
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -354,7 +430,7 @@ app.get('/api/classes/:classId/report', async (req, res) => {
         COALESCE(sm.total_marks, 100) as total_marks,
         COUNT(DISTINCT a.id) as total_assignments,
         COUNT(DISTINCT CASE WHEN att.status = 'present_submitted' THEN att.id END) as submitted,
-        COUNT(DISTINCT CASE WHEN att.status = 'present_not_submitted' THEN att.id END) as not_submitted,
+        COUNT(DISTINCT CASE WHEN att.status = 'late_submission' THEN att.id END) as not_submitted,
         COUNT(DISTINCT CASE WHEN att.status = 'absent' THEN att.id END) as absent
       FROM students s
       LEFT JOIN student_marks sm ON s.id = sm.student_id

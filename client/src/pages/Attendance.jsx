@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Check, X, AlertTriangle } from 'lucide-react';
+import { Search, Check, X, AlertTriangle, Clock } from 'lucide-react';
 import { api } from '../api';
 
 export default function Attendance() {
@@ -58,22 +58,28 @@ export default function Attendance() {
     
     if (!student || !date) return;
 
-    const result = await api.post('/attendance', {
-      studentId: student.id,
-      assignmentId: selectedAssignment || null,
-      date,
-      status,
-    });
+    try {
+      const result = await api.post('/attendance', {
+        studentId: student.id,
+        assignmentId: selectedAssignment || null,
+        date,
+        status,
+      });
 
-    alert(`Attendance marked! ${result.marksObtained > 0 ? `+${result.marksObtained} marks` : 'No marks'}`);
-    
-    const today = new Date().toISOString().split('T')[0];
-    const attendanceData = await api.get(`/attendance/${today}`);
-    setRecentAttendance(attendanceData);
-    
-    setStudent(null);
-    setRollNumber('');
-    setSelectedAssignment('');
+      const lateInfo = result.lateDays > 0 ? ` (${result.lateDays} day${result.lateDays > 1 ? 's' : ''} late)` : '';
+      alert(`Attendance marked! ${result.marksObtained > 0 ? `+${result.marksObtained} marks${lateInfo}` : 'No marks'}`);
+      
+      const today = new Date().toISOString().split('T')[0];
+      const attendanceData = await api.get(`/attendance/${today}`);
+      setRecentAttendance(attendanceData);
+      
+      setStudent(null);
+      setRollNumber('');
+      setSelectedAssignment('');
+      setStatus('present_submitted');
+    } catch (error) {
+      alert(error.message);
+    }
   };
 
   return (
@@ -158,15 +164,15 @@ export default function Attendance() {
                     onClick={() => setStatus('present_submitted')}
                   >
                     <Check size={20} style={{ margin: '0 auto 4px' }} />
-                    Submitted
+                    On Time
                     <br /><small>+7 marks</small>
                   </div>
                   <div
-                    className={`status-option not-submitted ${status === 'present_not_submitted' ? 'selected' : ''}`}
-                    onClick={() => setStatus('present_not_submitted')}
+                    className={`status-option not-submitted ${status === 'late_submission' ? 'selected' : ''}`}
+                    onClick={() => setStatus('late_submission')}
                   >
-                    <AlertTriangle size={20} style={{ margin: '0 auto 4px' }} />
-                    Not Submitted
+                    <Clock size={20} style={{ margin: '0 auto 4px' }} />
+                    Late Submission
                     <br /><small>-0.5/day</small>
                   </div>
                   <div
@@ -213,10 +219,10 @@ export default function Attendance() {
                     <td>{a.assignment_title || '-'}</td>
                     <td>
                       {a.status === 'present_submitted' && (
-                        <span className="badge badge-success">Submitted</span>
+                        <span className="badge badge-success">On Time</span>
                       )}
-                      {a.status === 'present_not_submitted' && (
-                        <span className="badge badge-warning">Not Submitted</span>
+                      {a.status === 'late_submission' && (
+                        <span className="badge badge-warning">Late</span>
                       )}
                       {a.status === 'absent' && (
                         <span className="badge badge-danger">Absent</span>
@@ -234,11 +240,11 @@ export default function Attendance() {
       <div className="card" style={{ marginTop: '20px' }}>
         <h2 style={{ marginBottom: '20px' }}>Attendance Rules</h2>
         <ul style={{ color: 'var(--text-light)', paddingLeft: '20px' }}>
-          <li><strong>Present + Submitted:</strong> Student gets +7 marks</li>
-          <li><strong>Present + Not Submitted:</strong> After deadline, -0.5 marks per day late</li>
-          <li><strong>Absent:</strong> 0 marks. After 2 consecutive absences, -0.5 countdown starts from 3rd absence</li>
-          <li><strong>Maximum marks:</strong> 100 per year</li>
-          <li><strong>Smart Search:</strong> Enter the 4-digit roll number to quickly find and mark attendance</li>
+          <li><strong>On Time Submission:</strong> Full marks (+7) if submitted before or on deadline</li>
+          <li><strong>Late Submission:</strong> -0.5 marks per day late (deducted from max 100)</li>
+          <li><strong>Absent:</strong> 0 marks</li>
+          <li><strong>Maximum marks:</strong> 100 per year (cap applied)</li>
+          <li><strong>No duplicates:</strong> Cannot submit the same assignment twice</li>
         </ul>
       </div>
     </div>

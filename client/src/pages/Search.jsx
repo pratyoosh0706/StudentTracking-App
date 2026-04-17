@@ -71,7 +71,7 @@ export default function SearchPage() {
     switch (status) {
       case 'present_submitted':
         return <Check size={16} color="var(--success)" />;
-      case 'present_not_submitted':
+      case 'late_submission':
         return <AlertTriangle size={16} color="var(--warning)" />;
       case 'absent':
         return <X size={16} color="var(--danger)" />;
@@ -83,9 +83,9 @@ export default function SearchPage() {
   const getStatusLabel = (status) => {
     switch (status) {
       case 'present_submitted':
-        return 'Submitted';
-      case 'present_not_submitted':
-        return 'Not Submitted';
+        return 'On Time';
+      case 'late_submission':
+        return 'Late';
       case 'absent':
         return 'Absent';
       default:

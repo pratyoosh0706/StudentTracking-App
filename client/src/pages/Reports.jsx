@@ -126,8 +126,8 @@ export default function Reports() {
                   <th>Email</th>
                   <th>Marks</th>
                   <th>Grade</th>
-                  <th>Submitted</th>
-                  <th>Not Submitted</th>
+                  <th>On Time</th>
+                  <th>Late</th>
                   <th>Absent</th>
                   <th>Actions</th>
                 </tr>

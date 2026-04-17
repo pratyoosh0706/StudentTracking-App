@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Users, FileText, Calendar } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Users, FileText, Calendar, Clock, Check, X } from 'lucide-react';
 import { api } from '../api';
 
 export default function ClassDetail() {
@@ -341,20 +341,23 @@ export default function ClassDetail() {
                     className={`status-option submitted ${bulkStatus === 'present_submitted' ? 'selected' : ''}`}
                     onClick={() => setBulkStatus('present_submitted')}
                   >
-                    Present + Submitted
+                    <Check size={20} style={{ margin: '0 auto 4px' }} />
+                    On Time
                     <br /><small>+7 marks</small>
                   </div>
                   <div
-                    className={`status-option not-submitted ${bulkStatus === 'present_not_submitted' ? 'selected' : ''}`}
-                    onClick={() => setBulkStatus('present_not_submitted')}
+                    className={`status-option not-submitted ${bulkStatus === 'late_submission' ? 'selected' : ''}`}
+                    onClick={() => setBulkStatus('late_submission')}
                   >
-                    Present + Not Submitted
+                    <Clock size={20} style={{ margin: '0 auto 4px' }} />
+                    Late Submission
                     <br /><small>-0.5/day</small>
                   </div>
                   <div
                     className={`status-option absent ${bulkStatus === 'absent' ? 'selected' : ''}`}
                     onClick={() => setBulkStatus('absent')}
                   >
+                    <X size={20} style={{ margin: '0 auto 4px' }} />
                     Absent
                     <br /><small>0 marks</small>
                   </div>
