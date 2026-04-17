@@ -680,6 +680,27 @@ tbody tr:hover {
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+  position: relative;
+}
+
+.tabs::after {
+  content: '';
+  position: absolute;
+  bottom: 16px;
+  right: 0;
+  width: 40px;
+  height: 24px;
+  background: linear-gradient(to right, transparent, var(--card));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.tabs.scroll-indicator::after {
+  opacity: 1;
 }
 
 .tab {
@@ -693,6 +714,7 @@ tbody tr:hover {
   font-weight: 500;
   font-size: 14px;
   white-space: nowrap;
+  scroll-snap-align: start;
 }
 
 .tab:hover {
@@ -986,9 +1008,18 @@ tbody tr:hover {
   padding: 8px 12px;
   padding-bottom: max(8px, env(safe-area-inset-bottom));
   z-index: 999;
-  justify-content: space-around;
+  justify-content: flex-start;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
   border-top: 1px solid rgba(0, 0, 0, 0.06);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  gap: 4px;
+  scroll-snap-type: x mandatory;
+}
+
+.bottom-nav a {
+  scroll-snap-align: start;
 }
 
 .mobile-header {
@@ -1184,13 +1215,19 @@ tbody tr:hover {
     bottom: 0;
     left: 0;
     right: 0;
-    background: var(--card);
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(16px);
     border-top: 1px solid var(--border);
-    padding: 10px 16px;
-    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    padding: 8px 12px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
     z-index: 999;
-    justify-content: space-around;
-    box-shadow: 0 -4px 12px rgba(0,0,0,0.05);
+    justify-content: flex-start;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    gap: 4px;
+    scroll-snap-type: x mandatory;
   }
   
 .bottom-nav a {
@@ -1243,6 +1280,30 @@ tbody tr:hover {
 
 .bottom-nav a {
   position: relative;
+}
+
+.bottom-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.bottom-nav {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+  height: 4px;
+}
+
+.tabs {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.tabs::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
 }
 }
 
